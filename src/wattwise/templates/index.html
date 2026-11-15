@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Compare the real cost of home appliances, from purchase price to ten years of electricity.">
+<title>Wattwise · See beyond the price tag</title>
+<link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+<script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
+<script src="{{ url_for('static', path='app.js') }}" defer></script>
+</head>
+<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}' hx-indicator="#busy" hx-sync="body:queue all">
+<div id="busy" class="htmx-indicator" role="status">Updating…</div>
+<header class="header"><a class="brand" href="/"><span class="brand-mark">ϟ</span>wattwise<span class="brand-dot">.</span></a><span class="header-note">A little insight. A lighter footprint.</span><nav><a href="/">My comparison</a><button hx-get="/saved" hx-target="#library">Saved comparisons</button>{% if not read_only %}<button hx-post="/reset" hx-target="#workspace" hx-swap="outerHTML">Reset ↺</button>{% endif %}</nav></header>
+<main>
+<div class="eyebrow"><span class="dot"></span> THE TRUE COST OF YOUR HOME</div>
+<section class="intro"><div><h1>See beyond<br>the price tag<span>.</span></h1><p>A better appliance decision starts with the whole picture.<br>Compare upfront prices, energy use, and what it all adds up to.</p></div><div class="intro-art" aria-hidden="true"><div class="orbit"></div><div class="plug">ϟ</div><span class="art-chip">Small watts. Big difference.</span><span class="spark">✳</span></div></section>
+<noscript><p class="notice error">Enable JavaScript to use the interactive comparison tools.</p></noscript>
+{% if read_only %}<section class="shared-banner"><div><strong>{{ snapshot.title }}</strong><p>Shared snapshot · Saved {{ snapshot.created }} UTC. Edits to your copy won't change this snapshot.</p></div><button class="primary" hx-post="/shared/{{ snapshot.id }}/load">Use a copy in my session →</button></section>{% endif %}
+{% include 'workspace.html' %}
+<div id="library"></div>
+<section class="explainer"><span aria-hidden="true">↗</span><div><h3>A higher label can mean a lower lifetime cost.</h3><p>Energy labels tell part of the story. Your usage and electricity rate tell the rest.</p></div><span class="leaf" aria-hidden="true">❋</span></section>
+<footer><a class="brand" href="/">wattwise.</a><span>Made for more considered choices.</span><span>Less energy. More clarity.</span></footer>
+</main>
+<dialog id="editor" aria-labelledby="dialog-heading"><div id="editor-content"></div></dialog><div id="toast" role="status"></div>
+</body></html>
