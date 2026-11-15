@@ -4,13 +4,14 @@ from pathlib import Path
 import secrets
 from urllib.parse import parse_qs
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
-from . import state
+from . import state, ai
 from .importer import lookup
 from .models import Appliance, Comparison, calculate
 
@@ -31,7 +32,7 @@ async def browser_session(request: Request, call_next):
     # JSON calculation API is stateless. All stateful UI mutations require CSRF.
     if request.method == 'POST' and request.url.path != '/api/compare':
         token = request.headers.get('X-CSRF-Token', '')
-        if not secrets.compare_digest(token, current['csrf']):
+        if not secrets.compare_digest(token.encode(), current['csrf'].encode()):
             return HTMLResponse('Session expired. Refresh the page before trying again.', status_code=403)
     response = await call_next(request)
     response.headers['Cache-Control'] = 'no-store'
@@ -57,6 +58,7 @@ def render(request, template, comparison=None, **extra):
         'max_total': max([row['total'] for row in rows] + [1]),
         'different_categories': len({row['category'] for row in rows}) > 1,
         'csrf': request.state.session['csrf'], 'categories': CATEGORIES, 'units': UNITS,
+        'ai_enabled': ai.settings().enabled, 'admin_enabled': bool(os.environ.get('WATTWISE_ADMIN_TOKEN')),
         'money': lambda n: f'{symbol}{n:,.2f}',
         'num': lambda n: f'{n:,.1f}'.rstrip('0').rstrip('.'),
         **extra,
@@ -90,7 +92,7 @@ async def settings(request: Request):
     data = await fields(request)
     c = request.state.session['comparison']
     try:
-        updated = Comparison.model_validate({**c, **{k: data[k] for k in ('rate', 'currency') if k in data}, 'years': int(data.get('years', c['years']))})
+        updated = Comparison.model_validate({**c, **{k: data[k] for k in ('rate', 'currency', 'market') if k in data}, 'years': int(data.get('years', c['years']))})
     except (ValidationError, ValueError):
         return render(request, 'workspace.html', error='Enter a valid electricity rate, currency, and comparison period.')
     changed_currency = updated.currency != c['currency']
@@ -153,6 +155,7 @@ async def reset(request: Request):
 @app.post('/lookup')
 async def lookup_form(request: Request):
     data = await fields(request)
+    result = {}
     try:
         result = await lookup(data.get('query', ''))
         data.update({k: v for k, v in result['specs'].items() if k in ('name', 'price', 'energy', 'basis', 'label')})
@@ -162,7 +165,8 @@ async def lookup_form(request: Request):
             message += f' Source price is in {source_currency}; convert it to your selected currency before saving.'
     except ValueError as exc:
         message = str(exc)
-    return render(request, 'editor.html', a=data, index=data.get('index') or None, message=message)
+    return render(request, 'editor.html', a=data, index=data.get('index') or None, message=message,
+                  evidence=result.get('evidence', {}), warnings=result.get('warnings', []), source_url=result.get('source_url'))
 
 
 @app.post('/save')
@@ -193,3 +197,58 @@ async def load_shared(request: Request, key: str):
         raise HTTPException(404, 'Saved comparison not found')
     request.state.session['comparison'] = deepcopy(snapshot['comparison'])
     return HTMLResponse('', headers={'HX-Redirect': '/'})
+
+
+basic = HTTPBasic(auto_error=False)
+
+
+def require_admin(credentials: HTTPBasicCredentials | None = Depends(basic)):
+    expected = os.environ.get('WATTWISE_ADMIN_TOKEN', '')
+    if not expected:
+        raise HTTPException(404, 'Admin settings are disabled. Set WATTWISE_ADMIN_TOKEN on the server.')
+    if credentials is None or not secrets.compare_digest(credentials.username.encode(), b'admin') or not secrets.compare_digest(credentials.password.encode(), expected.encode()):
+        raise HTTPException(401, 'Admin authentication required', headers={'WWW-Authenticate': 'Basic realm="Wattwise admin"'})
+
+
+@app.get('/admin', dependencies=[Depends(require_admin)])
+async def admin(request: Request):
+    return render(request, 'admin.html', model=ai.settings().model)
+
+
+@app.post('/admin/ai', dependencies=[Depends(require_admin)])
+async def admin_ai(request: Request):
+    data = await fields(request)
+    try:
+        ai.configure(api_key=data.get('api_key', '').strip() or None,
+                     model=data.get('model', '').strip(), disable=data.get('disable') == 'yes')
+        message = 'AI disabled.' if data.get('disable') == 'yes' else 'AI configuration updated. Reload your comparison to load appliance research.'
+    except ValueError as exc:
+        message = str(exc)
+    return render(request, 'admin_settings.html', model=ai.settings().model, message=message)
+
+
+async def research_fragment(request, item, market):
+    if not ai.settings().enabled:
+        return render(request, 'research.html', report=None, research_error='Appliance research is disabled.')
+    try:
+        report = await ai.research(item['name'], item.get('category', ''), market)
+        return render(request, 'research.html', report=report)
+    except ai.AIUnavailable as exc:
+        return render(request, 'research.html', report=None, research_error=str(exc))
+
+
+@app.get('/appliances/{index}/research')
+async def appliance_research(request: Request, index: int):
+    c = request.state.session['comparison']
+    if not 0 <= index < len(c['appliances']):
+        raise HTTPException(404, 'Appliance not found')
+    return await research_fragment(request, c['appliances'][index], c.get('market', ''))
+
+
+@app.get('/shared/{key}/appliances/{index}/research')
+async def shared_research(request: Request, key: str, index: int):
+    item = state.get_snapshot(key)
+    if not item or not 0 <= index < len(item['comparison']['appliances']):
+        raise HTTPException(404, 'Appliance not found')
+    c = item['comparison']
+    return await research_fragment(request, c['appliances'][index], c.get('market', ''))

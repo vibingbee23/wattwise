@@ -1,0 +1,9 @@
+<div class="research-content">
+<h4>Living with this appliance <span>AI research</span></h4>
+{% if report %}
+<p class="help">Checked {{ report.checked }} · Service market: {{ report.market }}<br>{% if report.model_match == 'series' %}<strong>Series-level evidence. Exact-model reports were limited.</strong>{% elif report.model_match == 'insufficient' %}<strong>Exact model could not be verified.</strong>{% else %}Model-specific search{% endif %}</p>
+<dl class="research-findings">{% for finding in report.findings %}<div><dt>{{ finding.label }}</dt><dd>{{ finding.text }}{% for url in finding.urls %} <a href="{{ url }}" target="_blank" rel="noopener noreferrer">[{{ loop.index }}]</a>{% endfor %}</dd></div>{% endfor %}</dl>
+{% if report.sources %}<details><summary>Sources ({{ report.sources|length }})</summary><ul>{% for url,title in report.sources.items() %}<li><a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ title }}</a></li>{% endfor %}</ul></details>{% endif %}
+<p class="help">Owner reports may be anecdotal. These findings do not affect the best-value calculation.</p>
+{% else %}<p class="help" role="status">{{ research_error }}</p><p class="help">Costs and manual specs remain available. Reload to retry when AI is available.</p>{% endif %}
+</div>

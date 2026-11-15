@@ -27,6 +27,7 @@ class Comparison(BaseModel):
     rate: float = Field(default=.30, ge=0, le=1000, allow_inf_nan=False)
     currency: Literal['EUR', 'USD', 'GBP'] = 'EUR'
     years: Literal[5, 10] = 10
+    market: str = Field(default='', max_length=100)
 
 
 def calculate(comparison: Comparison):

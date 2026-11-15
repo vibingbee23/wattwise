@@ -3,6 +3,8 @@
 <input type="hidden" name="index" value="{{ index if index is not none else '' }}">
 <label>Start with a product name or URL<div class="lookup"><input name="query" value="{{ a.get('query','') }}" placeholder="Brand + model, or paste a product URL" maxlength="2048"><button type="button" hx-post="/lookup" hx-include="#appliance-form" hx-target="#editor-content" hx-validate="false" hx-disabled-elt="this">Load specs ↗</button></div></label>
 <p class="help" role="status">{{ message or 'Have an energy label? You can enter all the details below.' }}</p>{% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+{% if evidence %}<details class="import-evidence"><summary>Where the imported fields came from</summary><ul>{% for field, origin in evidence.items() %}<li><strong>{{ field }}</strong>: {{ origin }}</li>{% endfor %}</ul>{% if source_url %}<a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Original product page ↗</a>{% endif %}</details>{% endif %}
+{% for warning in warnings or [] %}<p class="notice" role="status">{{ warning }}</p>{% endfor %}
 <div class="form-grid"><label class="full">Brand & model<input name="name" value="{{ a.get('name','') }}" required maxlength="200" placeholder="e.g. Bosch Series 6"></label>
 <label>Appliance type<select name="category" id="category">{% for category in categories %}<option {% if a.get('category') == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></label>
 <label>Energy label<select name="label"><option value="">Not specified</option>{% for label in ['A','B','C','D','E','F','G','A+','A++','A+++'] %}<option {% if a.get('label') == label %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>

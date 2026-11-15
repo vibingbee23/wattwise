@@ -10,7 +10,7 @@
 </head>
 <body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}' hx-indicator="#busy" hx-sync="body:queue all">
 <div id="busy" class="htmx-indicator" role="status">Updating…</div>
-<header class="header"><a class="brand" href="/"><span class="brand-mark">ϟ</span>wattwise<span class="brand-dot">.</span></a><span class="header-note">A little insight. A lighter footprint.</span><nav><a href="/">My comparison</a><button hx-get="/saved" hx-target="#library">Saved comparisons</button>{% if not read_only %}<button hx-post="/reset" hx-target="#workspace" hx-swap="outerHTML">Reset ↺</button>{% endif %}</nav></header>
+<header class="header"><a class="brand" href="/"><span class="brand-mark">ϟ</span>wattwise<span class="brand-dot">.</span></a><span class="header-note">A little insight. A lighter footprint.</span><nav>{% if admin_enabled %}<a href="/admin">Admin</a>{% endif %}<a href="/">My comparison</a><button hx-get="/saved" hx-target="#library">Saved comparisons</button>{% if not read_only %}<button hx-post="/reset" hx-target="#workspace" hx-swap="outerHTML">Reset ↺</button>{% endif %}</nav></header>
 <main>
 <div class="eyebrow"><span class="dot"></span> THE TRUE COST OF YOUR HOME</div>
 <section class="intro"><div><h1>See beyond<br>the price tag<span>.</span></h1><p>A better appliance decision starts with the whole picture.<br>Compare upfront prices, energy use, and what it all adds up to.</p></div><div class="intro-art" aria-hidden="true"><div class="orbit"></div><div class="plug">ϟ</div><span class="art-chip">Small watts. Big difference.</span><span class="spark">✳</span></div></section>
